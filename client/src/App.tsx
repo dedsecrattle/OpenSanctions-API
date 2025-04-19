@@ -8,6 +8,7 @@ import SearchBar from './components/SearchBar';
 import ResultsList from './components/ResultsList';
 import { searchSanctions } from './services/sanctionsService';
 import { Result } from './types';
+import Pagination from './components/Pagination';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -61,7 +62,6 @@ const AppContent: React.FC = () => {
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         <div className="max-w-2xl mx-auto p-4 sm:p-6 lg:p-8">
 
-          {/* HEADER */}
           <div className="flex justify-between items-start mb-6">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
@@ -79,8 +79,6 @@ const AppContent: React.FC = () => {
               {darkMode ? '🌞' : '🌙'}
             </button>
           </div>
-
-          {/* SEARCH CARD */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
             <SearchBar
               query={query}
@@ -90,51 +88,26 @@ const AppContent: React.FC = () => {
               onSearch={handleSearch}
             />
           </div>
-
-          {/* STATUS */}
           {isFetching && (
             <p className="text-center text-gray-600 dark:text-gray-300">Loading…</p>
           )}
           {error && (
             <p className="text-center text-red-500">{error.message}</p>
           )}
-
-          {/* RESULTS + PAGINATION */}
           {data && data.results.length > 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
               <ResultsList total={data.total} results={data.results} />
-
-              {/* Page Buttons */}
-              <div className="flex justify-center gap-2 mt-4">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-                  <button
-                    key={p}
-                    onClick={() => {
-                      if (p !== page) {
-                        setPage(p);
-                        setTrigger(true);
-                        void refetch();
-                      }
-                    }}
-                    className={`px-3 py-1 rounded-md text-sm ${
-                      p === page
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200'
-                    }`}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-
-              {/* Page Info */}
-              <p className="mt-4 text-center text-sm text-gray-600 dark:text-gray-400">
-                Page {page} of {totalPages}
-              </p>
+                <Pagination
+                  page={page}
+                  total={totalPages}
+                  onPageChange={p => {
+                    setPage(p);
+                    setTrigger(true);
+                    void refetch();
+                  }}
+                />
             </div>
           )}
-
-          {/* NO RESULTS */}
           {data && data.results.length === 0 && !isFetching && (
             <p className="text-center text-gray-700 dark:text-gray-300 mt-4">
               No results found.

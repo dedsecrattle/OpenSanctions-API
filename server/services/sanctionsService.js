@@ -1,10 +1,10 @@
-import axios from 'axios';
+import axios, { toFormData } from 'axios';
 import NodeCache from 'node-cache';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const API_URL = 'https://api.opensanctions.org/match/default';
+const API_URL = 'https://api.opensanctions.org/search/default';
 const API_KEY = process.env.OPENSANCTIONS_API_KEY;
 const ttl = Number(process.env.CACHE_TTL) || 600;
 
@@ -32,21 +32,16 @@ export const searchSanctionsService = async (
     type === 'entities' ? 'Organization' :
     'LegalEntity';
 
+  const params = { limit, offset, schema, q: query};
 
-  const body = {
-    queries: {
-      q1: {
-        properties: { name: [query] },
-        ...(schema && { schema }),
-      }
-    }
-  };
-  const params = { limit: 100 };
+  const resp = await axios.get(API_URL, { headers, params });
+  const data = resp.data;
 
-  const resp = await axios.post(API_URL, body, { headers, params });
-  const all = resp.data.responses.q1.results || [];
-  const total = all.length;
-  const pageSlice = all.slice(offset, offset + limit).map(r => ({
+  const total = data?.total?.value || 0;
+
+  const all = data?.results || [];
+
+  const results = all.map(r => ({
     id: r.id,
     name: r.caption || r.name,
     type: r.schema,
@@ -57,7 +52,9 @@ export const searchSanctionsService = async (
     location: r.properties?.country?.[0] || r.properties?.address?.[0] || null
   }));
 
-  const result = { total, results: pageSlice };
+
+
+  const result = { total, results: results };
   cache.set(cacheKey, result);
   return result;
 };
