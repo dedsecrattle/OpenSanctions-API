@@ -6,9 +6,9 @@ export const searchSanctions = async (
   type: 'all' | 'individuals' | 'entities',
   limit = 10,
   offset = 0
-): Promise<{ results: Result[]; total: number }> => {
+): Promise<{ total: number; results: Result[] }> => {
   const res = await axios.get('http://localhost:5000/api/sanctions/search', {
-    params: { query, type, limit, offset },
+    params: { query, type, limit, offset }
   });
   return res.data.data;
 };

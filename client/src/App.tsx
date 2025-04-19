@@ -1,82 +1,155 @@
-import { useState } from 'react';
-import { useQuery, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React, { useState, useEffect } from 'react';
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQuery
+} from '@tanstack/react-query';
 import SearchBar from './components/SearchBar';
 import ResultsList from './components/ResultsList';
 import { searchSanctions } from './services/sanctionsService';
 import { Result } from './types';
 
-const queryClient = new QueryClient();
+const ITEMS_PER_PAGE = 10;
 
-function AppContent() {
-  const [query, setQuery] = useState('');
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60_000,
+      gcTime: 30 * 60_000,
+      refetchOnWindowFocus: false
+    }
+  }
+});
+
+interface SanctionsData {
+  total: number;
+  results: Result[];
+}
+
+const AppContent: React.FC = () => {
+  const [query, setQuery] = useState<string>('');
   const [type, setType] = useState<'all' | 'individuals' | 'entities'>('all');
-  const [page, setPage] = useState(1);
-  const [triggerSearch, setTriggerSearch] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [page, setPage] = useState<number>(1);
+  const [trigger, setTrigger] = useState<boolean>(false);
+  const [darkMode, setDarkMode] = useState<boolean>(false);
 
-  const { data, error, isFetching, refetch } = useQuery({
+  const offset = (page - 1) * ITEMS_PER_PAGE;
+
+  const queryResult = useQuery<SanctionsData, Error>({
     queryKey: ['sanctions', query, type, page],
-    queryFn: () => searchSanctions(query, type, 10, (page - 1) * 10),
-    enabled: triggerSearch,
-    onSettled: () => setTriggerSearch(false)
+    queryFn: () => searchSanctions(query, type, ITEMS_PER_PAGE, offset),
+    enabled: trigger
   });
+
+  const { data, error, isFetching, isSuccess, isError, refetch } = queryResult;
+
+  useEffect(() => {
+    if (isSuccess || isError) setTrigger(false);
+  }, [isSuccess, isError]);
 
   const handleSearch = () => {
     if (!query.trim()) return;
     setPage(1);
-    setTriggerSearch(true);
-    refetch();
+    setTrigger(true);
+    void refetch();
   };
 
-  const totalPages = data ? Math.ceil(data.total / 10) : 0;
+  const totalPages = data ? Math.ceil(data.total / ITEMS_PER_PAGE) : 0;
 
   return (
-    <div className={`${darkMode ? 'dark' : ''} min-h-screen py-10 px-4 md:px-10 bg-gray-100 dark:bg-gray-900`}>
-      <div className="max-w-4xl mx-auto bg-white dark:bg-gray-800 shadow-xl rounded-2xl p-8">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-center w-full text-gray-800 dark:text-gray-100">Sanctions Screening</h1>
-          <button
-            onClick={() => setDarkMode(!darkMode)}
-            className="absolute top-5 right-6 text-sm text-gray-600 dark:text-gray-300"
-          >
-            {darkMode ? '🌞 Light' : '🌙 Dark'}
-          </button>
-        </div>
+    <div className={darkMode ? 'dark' : ''}>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-2xl mx-auto p-4 sm:p-6 lg:p-8">
 
-        <SearchBar query={query} setQuery={setQuery} type={type} setType={setType} onSearch={handleSearch} />
-
-        {isFetching && <p className="text-center text-gray-600 dark:text-gray-300">Loading...</p>}
-        {error && <p className="text-center text-red-500">{(error as Error).message}</p>}
-
-        {data && data.results.length > 0 && (
-          <>
-            <ResultsList results={data.results} total={data.total} />
-            <div className="flex justify-center mt-4 gap-2">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => {
-                    setPage(p);
-                    setTriggerSearch(true);
-                    refetch();
-                  }}
-                  className={`px-3 py-1 rounded-md border ${p === page ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600'}`}
-                >
-                  {p}
-                </button>
-              ))}
+          {/* HEADER */}
+          <div className="flex justify-between items-start mb-6">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
+                OFAC Sanctions Search Tool
+              </h1>
+              <p className="mt-1 text-gray-600 dark:text-gray-400">
+                Search the Office of Foreign Assets Control (OFAC) sanctions lists
+              </p>
             </div>
-          </>
-        )}
+            <button
+              onClick={() => setDarkMode(d => !d)}
+              className="ml-4 text-gray-600 dark:text-gray-300"
+              aria-label="Toggle dark mode"
+            >
+              {darkMode ? '🌞' : '🌙'}
+            </button>
+          </div>
+
+          {/* SEARCH CARD */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
+            <SearchBar
+              query={query}
+              setQuery={setQuery}
+              type={type}
+              setType={setType}
+              onSearch={handleSearch}
+            />
+          </div>
+
+          {/* STATUS */}
+          {isFetching && (
+            <p className="text-center text-gray-600 dark:text-gray-300">Loading…</p>
+          )}
+          {error && (
+            <p className="text-center text-red-500">{error.message}</p>
+          )}
+
+          {/* RESULTS + PAGINATION */}
+          {data && data.results.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+              <ResultsList total={data.total} results={data.results} />
+
+              {/* Page Buttons */}
+              <div className="flex justify-center gap-2 mt-4">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                  <button
+                    key={p}
+                    onClick={() => {
+                      if (p !== page) {
+                        setPage(p);
+                        setTrigger(true);
+                        void refetch();
+                      }
+                    }}
+                    className={`px-3 py-1 rounded-md text-sm ${
+                      p === page
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+
+              {/* Page Info */}
+              <p className="mt-4 text-center text-sm text-gray-600 dark:text-gray-400">
+                Page {page} of {totalPages}
+              </p>
+            </div>
+          )}
+
+          {/* NO RESULTS */}
+          {data && data.results.length === 0 && !isFetching && (
+            <p className="text-center text-gray-700 dark:text-gray-300 mt-4">
+              No results found.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
-}
+};
 
-export default function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <AppContent />
-    </QueryClientProvider>
-  );
-}
+const App: React.FC = () => (
+  <QueryClientProvider client={queryClient}>
+    <AppContent />
+  </QueryClientProvider>
+);
+
+export default App;
