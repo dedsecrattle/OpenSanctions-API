@@ -1,80 +1,42 @@
-import React, { useState, FormEvent } from 'react';
-import { searchSanctions } from '../services/sanctionsApi';
-import { SearchBarProps, SanctionType } from '../types';
 
-const SearchBar: React.FC<SearchBarProps> = ({ onResults, setLoading, setError }) => {
-  const [query, setQuery] = useState<string>('');
-  const [type, setType] = useState<SanctionType>('all');
-
-  const handleSearch = async (e: FormEvent) => {
-    e.preventDefault();
-    
-    if (!query.trim()) {
-      setError('Please enter a search term');
-      return;
-    }
-    
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await searchSanctions(query, type);
-      onResults(data);
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to fetch results');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="search-container">
-      <form onSubmit={handleSearch}>
-        <div className="search-input-group">
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Enter name to search..."
-            className="search-input"
-          />
-          <button type="submit" className="search-button">Search</button>
-        </div>
-        
-        <div className="filter-options">
-          <div className="filter-label">Filter by:</div>
-          <div className="radio-group">
-            <label className="radio-option">
-              <input
-                type="radio"
-                value="all"
-                checked={type === 'all'}
-                onChange={() => setType('all')}
-              />
-              All
-            </label>
-            <label className="radio-option">
-              <input
-                type="radio"
-                value="individuals"
-                checked={type === 'individuals'}
-                onChange={() => setType('individuals')}
-              />
-              Individuals
-            </label>
-            <label className="radio-option">
-              <input
-                type="radio"
-                value="entities"
-                checked={type === 'entities'}
-                onChange={() => setType('entities')}
-              />
-              Entities
-            </label>
-          </div>
-        </div>
-      </form>
-    </div>
-  );
+type Props = {
+  query: string;
+  setQuery: (val: string) => void;
+  type: 'all' | 'individuals' | 'entities';
+  setType: (val: 'all' | 'individuals' | 'entities') => void;
+  onSearch: () => void;
 };
 
-export default SearchBar;
+export default function SearchBar({ query, setQuery, type, setType, onSearch }: Props) {
+  return (
+    <div className="flex flex-col md:flex-row gap-4 items-center mb-6">
+      <input
+        type="text"
+        placeholder="Enter name..."
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg"
+      />
+      <div className="flex gap-2">
+        {['all', 'individuals', 'entities'].map((val) => (
+          <label key={val} className="flex items-center gap-1 capitalize">
+            <input
+              type="radio"
+              name="type"
+              value={val}
+              checked={type === val}
+              onChange={() => setType(val as typeof type)}
+            />
+            {val}
+          </label>
+        ))}
+      </div>
+      <button
+        onClick={onSearch}
+        className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg"
+      >
+        Search
+      </button>
+    </div>
+  );
+}

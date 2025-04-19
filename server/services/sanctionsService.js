@@ -1,27 +1,43 @@
 import axios from 'axios';
-
-const API_BASE_URL = 'https://api.opensanctions.org/v1';
+import dotenv from 'dotenv';
+dotenv.config();
+const API_URL = 'https://api.opensanctions.org/match/default';
 const API_KEY = process.env.OPENSANCTIONS_API_KEY;
+
+if (!API_KEY) {
+  throw new Error('Please set the OPENSANCTIONS_API_KEY environment variable');
+}
 
 export const searchSanctions = async (query, type = 'all') => {
   try {
-    const params = {
-      q: query,
-      api_key: API_KEY,
-      limit: 10
+    const headers = {
+      'Authorization': API_KEY,
+      'Content-Type': 'application/json'
     };
-    
-    if (type === 'individuals') {
-      params.schema = 'Person';
-    } else if (type === 'entities') {
-      params.schema = 'Organization';
-    }
-    
-    const response = await axios.get(`${API_BASE_URL}/match`, { params });
-    
+
+    const schema =
+      type === 'individuals' ? 'Person' :
+      type === 'entities' ? 'Organization' :
+      undefined;
+
+    const requestBody = {
+      queries: {
+        q1: {
+          schema,
+          properties: {
+            name: [query]
+          }
+        }
+      }
+    };
+
+    const response = await axios.post(requestBody, { headers });
+
+    const results = response.data.responses.q1.results || [];
+
     return {
-      total: response.data.total,
-      results: response.data.results.map(result => ({
+      total: results.length,
+      results: results.map(result => ({
         id: result.id,
         name: result.caption || result.name,
         type: result.schema,
@@ -34,6 +50,8 @@ export const searchSanctions = async (query, type = 'all') => {
     };
   } catch (error) {
     console.error('OpenSanctions API error:', error.response?.data || error.message);
-    throw new Error('Failed to fetch sanctions data');
+    throw new Error(
+      error.response?.data?.detail || error.message || 'Failed to fetch sanctions data'
+    );
   }
 };
